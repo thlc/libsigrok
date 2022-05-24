@@ -2558,6 +2558,22 @@ SR_PRIV gboolean sr_ut71x_packet_valid(const uint8_t *buf);
 SR_PRIV int sr_ut71x_parse(const uint8_t *buf, float *floatval,
 		struct sr_datafeed_analog *analog, void *info);
 
+/*--- dmm/ut8802e.c -----------------------------------------------------------*/
+
+#define UT8802E_PACKET_SIZE 8
+
+struct ut8802e_info {
+	gboolean is_voltage, is_resistance, is_capacitance, is_temperature;
+	gboolean is_celsius, is_fahrenheit, is_current, is_continuity;
+	gboolean is_diode, is_frequency, is_duty_cycle, is_dc, is_ac;
+	gboolean is_sign, is_power, is_loop_current, is_max, is_min, is_rel;
+	gboolean is_ol, is_hold;
+};
+
+SR_PRIV gboolean sr_ut8802e_packet_valid(const uint8_t *buf);
+SR_PRIV int sr_ut8802e_parse(const uint8_t *buf, float *floatval,
+		struct sr_datafeed_analog *analog, void *info);
+
 /*--- dmm/vc870.c -----------------------------------------------------------*/
 
 #define VC870_PACKET_SIZE 23

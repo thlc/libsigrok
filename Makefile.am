@@ -193,6 +193,7 @@ libsigrok_la_SOURCES += \
 	src/dmm/rs9lcd.c \
 	src/dmm/ut372.c \
 	src/dmm/ut71x.c \
+	src/dmm/ut8802e.c \
 	src/dmm/vc870.c \
 	src/dmm/vc96.c
 
@@ -667,6 +668,12 @@ src_libdrivers_la_SOURCES += \
 	src/hardware/uni-t-dmm/protocol.h \
 	src/hardware/uni-t-dmm/protocol.c \
 	src/hardware/uni-t-dmm/api.c
+endif
+if HW_UNI_T_UT8802E
+src_libdrivers_la_SOURCES += \
+	src/hardware/uni-t-ut8802e/protocol.h \
+	src/hardware/uni-t-ut8802e/protocol.c \
+	src/hardware/uni-t-ut8802e/api.c
 endif
 if HW_UNI_T_UT181A
 src_libdrivers_la_SOURCES += \
