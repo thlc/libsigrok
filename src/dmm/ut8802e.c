@@ -36,39 +36,68 @@ static uint8_t bcd_to_dec(uint8_t byte) {
 }
 
 static int parse_value(const uint8_t *buf, struct ut8802e_info *info,
-		       float *floatval, int *exponent)
+		       float *floatval, int *decimals)
 {
-	int intval;
+	int intval, exponent, fp, factor, extra_digits;
+	unsigned int i;
 
+	/* In some modes, we need to apply an exponent. */
+	struct s_exponents {
+		int mode;
+		int exp;
+		int extra_digits;
+	} exponents[] = {
+		{ 0x01, -3, 3 }, /* 200mV DC mode */
+		{ 0x1a,  3, 0 }, /* kOhms mode */
+		{ 0x1b,  3, 0 }, /* kOhms mode */
+		{ 0x1c,  3, 0 }, /* kOhms mode */
+		{ 0x1d,  6, 0 }, /* MOhms mode */
+		{ 0x1f,  6, 0 }, /* MOhms mode */
+		{ 0x27, -9, 6 }, /* nF auto-mode */
+		{ 0x28, -6, 6 }, /* uF auto-mode */
+		{ 0x29,  0, 0 }, /* mF auto-mode */
+		{ 0x2c,  3, 0 }, /* kHz auto-mode */
+		{ 0x0d, -6, 6 }, /* uA mode */
+		{ 0x0e, -4, 4 }, /* weird mA mode */
+		{ 0x11, -3, 3 }, /* mA mode */
+		{ 0x12, -3, 3 }, /* mA mode */
+	};
+
+        /* Convert the raw BCD-encoded value into a decimal integer. */
 	intval = bcd_to_dec(buf[4]) * 10000 +
 		 bcd_to_dec(buf[3]) * 100 +
 		 bcd_to_dec(buf[2]);
-	*exponent = buf[5] & 0xf;
-	*floatval = intval / powf(10, *exponent);
 
 	if (info->is_ol) {
 		*floatval = INFINITY;
+		*decimals = 0;
+		return SR_OK;
 	}
 
-	*floatval *= info->is_sign ? -1 : 1;
 
-	/* TODO: some modes are using an automatic range:
-	 *  - frequency
-	 *  - capacitance
-	 */
-	if (info->is_frequency && buf[1] == 0x2c)
-		*floatval *= 1000;
-
-	if (info->is_capacitance) {
-		switch (buf[1]) {
-		case 0x27:
-			*floatval /= 1000;
-			break;
-		case 0x28:
-			*floatval /= 1; /* FIXME */
+	/* Check if there is an exponent defined for the current mode */
+	exponent = 0;
+	extra_digits = 0;
+	for (i = 0; i < sizeof(exponents) / sizeof(*exponents); i++) {
+		if (exponents[i].mode == buf[1]) {
+			exponent = exponents[i].exp;
+			extra_digits = exponents[i].extra_digits;
 			break;
 		}
 	}
+
+	fp = buf[5] & 0xf;
+	factor = fp - exponent;
+	*decimals = fp + extra_digits;
+	*floatval = intval / powf(10, factor);
+
+	*floatval *= info->is_sign ? -1 : 1;
+
+	sr_dbg("Decimals: %i", *decimals);
+	sr_dbg("Exponent: %i", exponent);
+	sr_dbg("Factor: %i", factor);
+	sr_dbg("Result: %i / powf(10, %i)", intval, factor);
+	sr_dbg("Float returned: %f", *floatval);
 
 	return SR_OK;
 }
@@ -262,7 +291,7 @@ SR_PRIV gboolean sr_ut8802e_packet_valid(const uint8_t *buf)
 SR_PRIV int sr_ut8802e_parse(const uint8_t *buf, float *floatval,
 			     struct sr_datafeed_analog *analog, void *info)
 {
-	int ret, exponent = 0;
+	int ret, digits = 0;
 	struct ut8802e_info *info_local;
 
 	info_local = info;
@@ -273,7 +302,7 @@ SR_PRIV int sr_ut8802e_parse(const uint8_t *buf, float *floatval,
 
 	parse_flags(buf, info_local);
 
-	if ((ret = parse_value(buf, info, floatval, &exponent)) != SR_OK) {
+	if ((ret = parse_value(buf, info, floatval, &digits)) != SR_OK) {
 		sr_dbg("Error parsing value: %d.", ret);
 		return ret;
 	}
@@ -281,8 +310,8 @@ SR_PRIV int sr_ut8802e_parse(const uint8_t *buf, float *floatval,
 	handle_flags(analog, floatval, info);
 
 	/* FIXME: is that right? */
-	analog->encoding->digits = exponent;
-	analog->spec->spec_digits = exponent;
+	analog->encoding->digits = digits;
+	analog->spec->spec_digits = digits;
 
 	return SR_OK;
 }
