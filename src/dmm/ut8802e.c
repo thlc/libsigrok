@@ -32,14 +32,17 @@
 #define LOG_PREFIX "ut8802e"
 
 static uint8_t bcd_to_dec(uint8_t byte) {
-  return (byte >> 4) * 10 + (byte & 0xf);
+	return (byte >> 4) * 10 + (byte & 0xf);
 }
 
-static int parse_value(const uint8_t *buf, struct ut8802e_info *info, float *floatval, int *exponent)
+static int parse_value(const uint8_t *buf, struct ut8802e_info *info,
+		       float *floatval, int *exponent)
 {
 	int intval;
 
-	intval = bcd_to_dec(buf[4]) * 10000 + bcd_to_dec(buf[3]) * 100 + bcd_to_dec(buf[2]);
+	intval = bcd_to_dec(buf[4]) * 10000 +
+		 bcd_to_dec(buf[3]) * 100 +
+		 bcd_to_dec(buf[2]);
 	*exponent = buf[5] & 0xf;
 	*floatval = intval / powf(10, *exponent);
 
@@ -67,7 +70,6 @@ static int parse_value(const uint8_t *buf, struct ut8802e_info *info, float *flo
 		}
 	}
 
-
 	return SR_OK;
 }
 
@@ -89,7 +91,6 @@ static void parse_flags(const uint8_t *buf, struct ut8802e_info *info)
 	case 0x06: /* DC 1000V */
 		info->is_voltage = info->is_dc = TRUE;
 		break;
-
 	case 0x1F: /* 200M ohm */
 	case 0x1D: /* 2M */
 	case 0x1C: /* 200K */
@@ -143,7 +144,7 @@ static void parse_flags(const uint8_t *buf, struct ut8802e_info *info)
 }
 
 static void handle_flags(struct sr_datafeed_analog *analog,
-		float *floatval, const struct ut8802e_info *info)
+			 float *floatval, const struct ut8802e_info *info)
 {
 	/* Measurement modes */
 	if (info->is_voltage) {
@@ -217,7 +218,6 @@ static void handle_flags(struct sr_datafeed_analog *analog,
 		analog->meaning->mqflags |= SR_MQFLAG_RELATIVE;
 	if (info->is_hold)
 		analog->meaning->mqflags |= SR_MQFLAG_HOLD;
-
 }
 
 static gboolean flags_valid(const struct ut8802e_info *info)
@@ -260,7 +260,7 @@ SR_PRIV gboolean sr_ut8802e_packet_valid(const uint8_t *buf)
 }
 
 SR_PRIV int sr_ut8802e_parse(const uint8_t *buf, float *floatval,
-		struct sr_datafeed_analog *analog, void *info)
+			     struct sr_datafeed_analog *analog, void *info)
 {
 	int ret, exponent = 0;
 	struct ut8802e_info *info_local;
@@ -280,6 +280,7 @@ SR_PRIV int sr_ut8802e_parse(const uint8_t *buf, float *floatval,
 
 	handle_flags(analog, floatval, info);
 
+	/* FIXME: is that right? */
 	analog->encoding->digits = exponent;
 	analog->spec->spec_digits = exponent;
 
