@@ -30,29 +30,29 @@
  * This driver is meant to support Silicon Labs CP2110 HID-to-UART chipset
  * used in the UT8802E multimeter.
  *
- * CP2110 Datasheet : 
+ * CP2110 Datasheet:
  * https://www.silabs.com/documents/public/application-notes/an434-cp2110-4-interface-specification.pdf
  *
  * A DMM packet is 8-byte.
- * The data for one DMM packet is spread across multiple chunks.
- * A packet is complete once we got 8 bytes of actual data. Every packets start
- * with a 0xAC byte.
+ * The data for one DMM packet is spread across multiple HID chunks.
+ * A DMM packet is complete once we got 8 bytes of actual data.
+ * Every packet starts with a 0xAC byte.
  *
- * A chunk looks like this:
+ * A HID data chunk looks like this:
  *
  * - Byte 0: 0x0z, where z is the number of actual data bytes in this chunk.
- * - Byte 1-z: z data bytes.
+ * - Bytes 1-z: z data bytes.
  *
  * Example of a complete DMM packet:
  *
- * - 0xAC: magic marker
- * - 0xXX: the selected mode and range
- * - 0xXX: the 2 rightmost digits of the display reading
- * - 0xXX: the middle digits of the display reading
- * - 0xXX: the 2 leftmost digits of the display reading
- * - 0xXX: 0x30 & number of digits after decimal point
- * - 0xXX: various flags (min, max, hold, rel, OL, sign)
- * - 0xXX: probably some kind of checksum.
+ * - 1 byte: 0xAC magic marker
+ * - 1 byte: the selected mode and range
+ * - 1 byte: ---XX digits
+ * - 1 byte: -XX-- digits
+ * - 1 byte: X---- digit (5 digits max. total)
+ * - 1 byte: 0x30 & number of digits after decimal point
+ * - 1 byte: flags (min, max, hold rel, OL, sign)
+ * - 1 byte: checksum (probably - TODO)
  */
 
 static void decode_packet(struct sr_dev_inst *sdi, const uint8_t *buf)
@@ -124,27 +124,26 @@ static int hid_chip_init(struct sr_dev_inst *sdi)
 		return SR_ERR;
 	}
 
-
 	/* UART Enable */
-	buf[0] = 0x41;
-	buf[1] = 0x01;
+	buf[0] = 0x41; /* Report ID */
+	buf[1] = 0x01; /* Argument: 0x1 - ON */
 	ret = libusb_control_transfer(
 		usb->devhdl,
-		LIBUSB_ENDPOINT_OUT | 0x21, /* Endpoint (should be 0x21) */
-		0x09, /* Set Report */
-		0x0341, /* Feature | UART Enable (0x3 << 8 | 0x41) */
-		0, /* wIndex */
-		(unsigned char*)&buf, /* data */
-		2, /* wLength */
-		10000);
+		LIBUSB_ENDPOINT_OUT | 0x21, /* Endpoint (should be 0x21 - FIXME: why?) */
+		0x09,                       /* Set Report */
+		(0x3 << 8) | 0x41,          /* UART Enable */
+		0,                          /* wIndex */
+		(unsigned char*)&buf,       /* payload */
+		2,                          /* wLength */
+		1000);
 
 	if (ret < 0) {
 		sr_err("Failed to enable the UART (%s)", libusb_error_name(ret));
 		return SR_ERR;
 	}
-	
-	/* the first byte of the payload is always the Report ID, per specs. */
-	buf[0] = 0x50;
+
+	/* Set UART Config */
+	buf[0] = 0x50; /* Report ID */
 
 	/* baud rate, MSB first */
 	buf[1] = 0x00;
@@ -164,23 +163,19 @@ static int hid_chip_init(struct sr_dev_inst *sdi)
 	/* Stop Bits */
 	buf[8] = 0x0;
 
-	/* Set UART Config (Report ID 0x50) */
 	ret = libusb_control_transfer(
 		usb->devhdl,
-		LIBUSB_ENDPOINT_OUT | 0x21,
-		0x09, /* Set Report */
-		(0x3 << 8) | 0x50, /* Set UART Config 0x50 */
-		0,
-		(unsigned char *)&buf,
-		9,
-		10000);
+		LIBUSB_ENDPOINT_OUT | 0x21, /* Endpoint (0x21 - FIXME: why?) */
+		0x09,                       /* Set Report */
+		(0x3 << 8) | 0x50,          /* Set UART Config */
+		0,                          /* wIndex */
+		(unsigned char *)&buf,      /* payload */
+		9,                          /* wLength */
+		1000);
 
 	if (ret < 0) {
 		sr_err("Set UART Config Failed (%s)", libusb_error_name(ret));
 		return SR_ERR;
-	}
-	else {
-		sr_dbg("Set UART Config OK");
 	}
 
 	/* Purge FIFOs */
@@ -189,29 +184,25 @@ static int hid_chip_init(struct sr_dev_inst *sdi)
 
 	ret = libusb_control_transfer(
 		usb->devhdl,
-		LIBUSB_ENDPOINT_OUT | 0x21,
-		0x09, /* Set Report */
-		(0x3 << 8) | 0x43,
-		0,
-		(unsigned char *)&buf,
-		2,
-		10000);
+		LIBUSB_ENDPOINT_OUT | 0x21, /* Endpoint (0x21 - FIXME: why?) */
+		0x09,                       /* Set Report */
+		(0x3 << 8) | 0x43,          /* Purge FIFOs */
+		0,                          /* wIndex */
+		(unsigned char *)&buf,      /* payload */
+		2,                          /* wLength */
+		1000);
 
 	if (ret < 0) {
 		sr_err("Purge FIFOs Failed");
 		return SR_ERR;
-	} else {
-		sr_dbg("Purge FIFO OK");
 	}
-
-	sr_dbg("HID initialized");
 
 	return SR_OK;
 }
 
 static void log_chunk(const uint8_t *buf, int len)
 {
-	sr_spew("chunk data:");
+	sr_dbg("HID chunk data:");
 	for (int i = 0; i < len; i++) {
 		sr_spew("[%i]: %02x", i, buf[i]);
 	}
