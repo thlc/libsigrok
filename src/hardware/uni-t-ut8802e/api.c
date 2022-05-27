@@ -171,7 +171,7 @@ static int dev_acquisition_stop(struct sr_dev_inst *sdi)
 SR_REGISTER_DEV_DRIVER_LIST(uni_t_ut8802e_drivers,
 	DMM(
 		"uni-t-ut8802e", ut71x,
-		"UNI-T", "UT8802E", 2400, UT8802E_PACKET_SIZE,
+		"UNI-T", "UT8802E", 9600, UT8802E_PACKET_SIZE,
 		sr_ut8802e_packet_valid, sr_ut8802e_parse, NULL
 	),
 );

@@ -104,8 +104,10 @@ static int hid_chip_init(struct sr_dev_inst *sdi)
 	int ret;
 	uint8_t buf[64];
 	struct sr_usb_dev_inst *usb;
+	struct dmm_info *dmm;
 
 	usb = sdi->conn;
+	dmm = (struct dmm_info *)sdi->driver;
 
 	sr_dbg("Initializing UART...");
 
@@ -145,13 +147,13 @@ static int hid_chip_init(struct sr_dev_inst *sdi)
 	/* Set UART Config */
 	buf[0] = 0x50; /* Report ID */
 
-	/* baud rate, MSB first */
-	buf[1] = 0x00;
-	buf[2] = 0x00;
-	buf[3] = 0x25;
-	buf[4] = 0x80;
+	/* baud rate */
+	buf[1] = (dmm->baudrate >> 24) & 0xff;
+	buf[2] = (dmm->baudrate >> 16) & 0xff;
+	buf[3] = (dmm->baudrate >> 8) & 0xff;
+	buf[4] = dmm->baudrate & 0xff;
 
-	/* Parity (fucked up ?) */
+	/* Parity */
 	buf[5] = 0x00;
 
 	/* Flow Control */

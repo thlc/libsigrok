@@ -41,9 +41,9 @@ struct dmm_info {
 	gsize info_size;
 };
 
-#define CHUNK_SIZE		8
+#define CHUNK_SIZE		128
 
-#define DMM_BUFSIZE		256
+#define DMM_BUFSIZE		1024
 
 struct dev_context {
 	struct sr_sw_limits limits;
